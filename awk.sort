@@ -1,0 +1,6 @@
+#!/bin/bash
+FILES=/data/CurSymbol*
+for f in $FILES
+do 
+awk '{print (($4/($4+$6)) - ($8/($8+$10))) " ," ($4/($4+$6)) "," $4+$6 "," $2 "," ($8/($8+$10)) "," ($8+$10)}' $f | sort -rn -o $f.sorted
+done
