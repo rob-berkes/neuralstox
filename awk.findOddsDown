@@ -1,0 +1,2 @@
+#!/bin/bash
+awk '($3/$5)>0  {print ($3/$5) " " $3+$5 " " $1}' /data/work/2009/ConnPredicts.rpt | sort -rn > /data/work/2009/OddsDown.rpt
