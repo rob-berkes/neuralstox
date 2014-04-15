@@ -1,7 +1,9 @@
 #!/bin/bash
-FILES=/data/CurSymbol*.sorted
+FILES=/data/work/2009/sorted/CurSymbol*.sorted
 
 for f in $FILES
 do
 awk -F ',' '(($1>0.15) || ($1 < -0.15)) && $3 > 30 && $6 > 40 {print}' $f > $f.filtered
 done 
+
+mv -v /data/work/2009/sorted/CurSy*.filtered /data/work/2009/filtered/

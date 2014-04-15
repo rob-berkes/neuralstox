@@ -115,7 +115,7 @@ int StockDS::find_stock_dated(string Symbol, string datetofind){
 }
 void StockDS::writeMatchesToFile(string CurSymbol) {
     std::fstream file;
-    string ofname = "/data/CurSymbol."+CurSymbol+".lossday";
+    string ofname = "/data/work/tmp/CurSymbol."+CurSymbol+".gainday";
     file.open(ofname.c_str(),std::fstream::out);
     Neurons *mlist = this->matchList;
     while (mlist!=NULL){
@@ -207,8 +207,8 @@ void StockDS::score_prev_day(string WatchedSymbol)
     int day = 0;
 
     while (ptr->symbol.compare(WatchedSymbol)==0) {  //cycle: every day of a stock report for symbol
-       // if (ptr->close > ptr->pclose) { //Matches a 'gain' day, now record symbols prev day...
-          if (ptr->close < ptr->pclose) {  //matches a 'loss' day
+        if (ptr->close > ptr->pclose) { //Matches a 'gain' day, now record symbols prev day...
+       //   if (ptr->close < ptr->pclose) {  //matches a 'loss' day
             Neurons *symptr = this->matchList;
 
             while (symptr!=NULL){   //cycle: neurons

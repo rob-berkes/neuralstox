@@ -12,6 +12,7 @@ int main(int argc, const char * argv[]) {
 	connDataSet.fillout_symbolList();
 	connDataSet.predictOddsDown();
 	connDataSet.writePredictsToFile();
-		
-
+	string futureCheckDate="2009-07-06";
+	connDataSet.build_stockList(futureCheckDate.c_str());
+	connDataSet.checkOddsDownOutliers();		
 }
