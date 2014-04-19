@@ -98,7 +98,7 @@ public:
 	ConnDaily();
 	ConnDaily(string sym);
 	ConnDaily(string sym, double close, double pclose);
-	void print();\
+	void print();
 };
 
 void ConnDaily::print(){
@@ -206,7 +206,8 @@ ConnPredicts::ConnPredicts(){
 
 class ConnDailyMeta {
 public:
-	Connections  *fullConnList;
+	Connections  *lossdayNeuronList;
+	Connections  *gaindayNeuronList;
 	ConnDaily    *symbolList;
 	StockClass   *stockList;
 	ConnPredicts *predictionList;
@@ -215,18 +216,23 @@ public:
 	int build_symbolList();
 	int build_predictionList();
 	int fillout_symbolList();
-	int build_fullConnList();
+	int buildNeuronList(Connections * ptr, string InputFile);
 	int build_stockList(string dateToFind);
 	int predictOddsDown();	
+	int predictOddsUp();	
 	int checkOddsDownOutliers();
+	int checkOddsUpOutliers();
 	void writePredictsToFile();
+	string LossdayInputFile;	
+	string GaindayInputFile;	
 private:
-	string fullConnsInputFile;	
 	string symbolListInputFile;
 	string stockListInputFile;
 	string predictsOutputFile;
 	string oddsDownOutliersFile;
+	string oddsUpOutliersFile;
 	string futureCheckDate;
+	string neuronSaveFile;
 	double successThreshold;
 	double failureThreshold;
 };
@@ -270,6 +276,66 @@ int ConnDailyMeta::build_predictionList(){
 
 
 
+}
+int ConnDailyMeta::checkOddsUpOutliers(){
+	cout << "checking predictor results...\n";
+	PredictChecks * plist = this->pcheckList;
+	ifstream file(this->oddsUpOutliersFile.c_str());
+	string odds;
+	string occs;
+	int successes=0;
+	int failures=0;
+	string symbol;
+	StockClass * sl = this->stockList;
+	ConnDaily * syml = this->symbolList;
+	int done=0;
+	while (file.good()) {
+		getline(file,odds,' ');
+		getline(file,occs,' ');
+		getline(file,symbol,'\n');
+		plist->symbol = symbol;
+		plist->oddsUp = ::atof(odds.c_str());
+		plist->next = new PredictChecks;
+		sl=this->stockList;
+		syml=this->symbolList;
+		while (syml->symbol.compare(plist->symbol)!=0)
+			syml=syml->next;
+		while ( ((sl->date.compare(this->futureCheckDate.c_str())!=0)	|| (sl->symbol.compare(symbol)!=0))){
+			sl=sl->next;
+		}
+		if (sl!=NULL){
+			if (sl->close < syml->close){
+				plist->result="Down";
+				if (plist->oddsUp >=  this->successThreshold)
+					failures++;
+				else if (plist->oddsUp <= this->failureThreshold)
+					successes++;
+				plist->print();
+			}
+			else if (sl->close > syml->close){
+				plist->result="Up";
+				if (plist->oddsUp >= this->successThreshold)
+					successes++;
+				else if (plist->oddsUp <= this->failureThreshold)
+					failures++;
+				plist->print();
+			}
+			else{
+				plist->print();	
+				plist->result="unch";
+			}
+		}
+		plist=plist->next;
+	}
+
+	cout << "\nSuccesses: ";
+	cout << successes;
+	cout << " Failures: ";
+	cout << failures;
+	cout << "\n";
+
+	file.close();
+return 1;
 }
 int ConnDailyMeta::checkOddsDownOutliers(){
 	cout << "checking predictor results...\n";
@@ -330,9 +396,9 @@ int ConnDailyMeta::checkOddsDownOutliers(){
 	file.close();
 return 1;
 }
-int ConnDailyMeta::predictOddsDown(){
-	cout << "predicting oddsDown..\n";
-	Connections * fullConnPtr = this->fullConnList;
+int ConnDailyMeta::predictOddsUp(){
+	cout << "predicting oddsUp..\n";
+	Connections * fullConnPtr = this->gaindayNeuronList;
 	ConnDaily * symbolPtr = this->symbolList;
 	ConnPredicts * plist = this->predictionList;
 	while (fullConnPtr != NULL) {
@@ -340,10 +406,51 @@ int ConnDailyMeta::predictOddsDown(){
 		plist = this->predictionList;
 		string Symbol = fullConnPtr->sym;
 		string Master = fullConnPtr->parSym;
-		while ((symbolPtr != NULL) && (symbolPtr->symbol.compare(Symbol.c_str())!=0)) {
+		while ((symbolPtr != NULL) && (symbolPtr->symbol.compare(Symbol)!=0)) {
 			symbolPtr = symbolPtr->next;
 		}
-		while ((plist != NULL) && (plist->symbol.compare(Master.c_str())!=0)) {
+		cout << symbolPtr;
+		while ((plist != NULL) && (plist->symbol.compare(Master)!=0)) {
+			plist = plist->next;
+		}
+		if ((plist!=NULL) && (symbolPtr!=NULL)) {
+
+			if ((fullConnPtr->strength > 0.0) && (symbolPtr->close < symbolPtr->pclose)) {
+				plist->close_total++;	
+				plist->oddsUp = (plist->close_match/plist->close_total);
+			} else if ((fullConnPtr->strength > 0.0) && (symbolPtr->close > symbolPtr->pclose)) {
+				plist->close_match++;
+				plist->close_total++;
+				plist->oddsUp = (plist->close_match/plist->close_total);
+			} else if ((fullConnPtr->strength < 0.0) && (symbolPtr->close > symbolPtr->pclose)) {
+				plist->close_total++;
+				plist->oddsUp = (plist->close_match/plist->close_total);
+			} else if ((fullConnPtr->strength < 0.0) && (symbolPtr->close < symbolPtr->pclose)) {
+				plist->close_match++;
+				plist->close_total++;
+				plist->oddsUp = (plist->close_match/plist->close_total);
+			}
+			plist->print();
+		}
+	
+			fullConnPtr=fullConnPtr->next;		
+		}
+	return 1;
+}
+int ConnDailyMeta::predictOddsDown(){
+	cout << "predicting oddsDown..\n";
+	Connections * fullConnPtr = this->lossdayNeuronList;
+	ConnDaily * symbolPtr = this->symbolList;
+	ConnPredicts * plist = this->predictionList;
+	while (fullConnPtr != NULL) {
+		symbolPtr = this->symbolList;
+		plist = this->predictionList;
+		string Symbol = fullConnPtr->sym;
+		string Master = fullConnPtr->parSym;
+		while ((symbolPtr != NULL) && (symbolPtr->symbol.compare(Symbol)!=0)) {
+			symbolPtr = symbolPtr->next;
+		}
+		while ((plist != NULL) && (plist->symbol.compare(Master)!=0)) {
 			plist = plist->next;
 		}
 		if ((fullConnPtr->strength > 0.0) && (symbolPtr->close < symbolPtr->pclose)) {
@@ -366,18 +473,20 @@ int ConnDailyMeta::predictOddsDown(){
 	}
 return 1;
 }
-
 ConnDailyMeta::ConnDailyMeta(){
-	this->fullConnList=NULL;
+	this->lossdayNeuronList=NULL;
+	this->gaindayNeuronList=NULL;
 	this->symbolList=NULL;
 	this->pcheckList= new PredictChecks;
 	this->stockList=new StockClass;
 	this->futureCheckDate = "2009-07-06";
-	this->fullConnsInputFile = "LossdayConnsMaster.rpt";
+	this->LossdayInputFile = "LossdayConnsMaster.rpt";
+	this->GaindayInputFile = "GaindayConnsMaster.rpt";
 	this->symbolListInputFile = "symbol.list";
 	this->stockListInputFile = "/data/y09h02.csv";
 	this->predictsOutputFile = "/data/work/2009/ConnPredicts.rpt";
-	this->oddsDownOutliersFile = "/data/work/2009/OddsDownOver150.rpt";
+	this->oddsDownOutliersFile = "/data/work/2009/OddsDown.rpt";
+	this->oddsDownOutliersFile = "/data/work/2009/OddsUp.rpt";
 	this->successThreshold = 0.5;
 	this->failureThreshold = 0.5;
 
@@ -464,11 +573,11 @@ int ConnDailyMeta::fillout_symbolList(){
 return 1;
 }
 
-int ConnDailyMeta::build_fullConnList(){
+int ConnDailyMeta::buildNeuronList(Connections * connlist, string InputFile){
 	cout << "building fullConList...\n";
-	this->fullConnList= new Connections;
-        Connections *ptr = this->fullConnList;
-	ifstream file(this->fullConnsInputFile.c_str());
+	connlist= new Connections;
+        Connections *ptr = connlist;
+	ifstream file(InputFile.c_str());
         string symbol;
         string parsymbol;
         string strength;
